@@ -300,6 +300,16 @@ theorem placeEl_inline (t : Tag) (h : t.ctx = .phrasing) (attrs : List (Attr ρ)
     placeEl .flow t attrs children = some (.inline rfl (.el t h attrs children)) := by
   simp [placeEl, h]
 
+/-- A successful placement witnesses `Tag.PlacesIn`. -/
+theorem placeEl_placesIn {c : Ctx} {t : Tag} {attrs : List (Attr ρ)} {children : Nodes ρ t.childCtx}
+    {n : Node ρ c} (h : placeEl c t attrs children = some n) : t.PlacesIn c := by
+  unfold placeEl at h
+  split at h
+  · exact Or.inl ‹_›
+  · split at h
+    · exact Or.inr ‹_›
+    · exact absurd h (by simp)
+
 theorem placeVoid_self (t : VoidTag) (attrs : List (Attr ρ)) :
     placeVoid t.ctx t attrs = some (.void t rfl attrs) := by
   simp [placeVoid]
@@ -361,7 +371,7 @@ theorem parseNode_el (route? : String → Option ρ) (url : ρ → String) (c : 
     (children.render url ++ '<' :: '/' :: (t.name.toList ++ '>' :: rest))
   rw [he, takeWhile_append_cons_of_all isNameChar _ (Tag.name_chars t) hne,
     dropWhile_append_cons_of_all isNameChar _ (Tag.name_chars t) hne, ← he]
-  simp only [String.ofList_toList, Tag.ofName?_name]
+  simp only [String.ofList_toList, Tag.ofNameIn?_name t c (placeEl_placesIn hplace)]
   rw [parseAttrs_render route? url attrs hattrs _ (k + 1) (by omega)]
   simp only [ih, dropClose_append, hplace]
 
@@ -378,7 +388,7 @@ theorem parseNode_void (route? : String → Option ρ) (url : ρ → String) (c 
   obtain ⟨e, es, he, hne⟩ := renderAttrs_gt_head url attrs rest
   rw [he, takeWhile_append_cons_of_all isNameChar _ (VoidTag.name_chars t) hne,
     dropWhile_append_cons_of_all isNameChar _ (VoidTag.name_chars t) hne, ← he]
-  simp only [String.ofList_toList, Tag.ofName?_voidName, VoidTag.ofName?_name]
+  simp only [String.ofList_toList, Tag.ofNameIn?_voidName, VoidTag.ofName?_name]
   rw [parseAttrs_render route? url attrs hattrs _ (k + 1) (by omega)]
   simp only [hplace]
 
@@ -396,7 +406,7 @@ theorem parseNode_title (route? : String → Option ρ) (s : String) (rest : Lis
       '<' :: '/' :: 't' :: 'i' :: 't' :: 'l' :: 'e' :: '>' :: rest) := rfl
   rw [h1, takeWhile_append_cons_of_all isNameChar _ title_chars isNameChar_gt,
     dropWhile_append_cons_of_all isNameChar _ title_chars isNameChar_gt, ofList_title,
-    Tag.ofName?_title, VoidTag.ofName?_title]
+    Tag.ofNameIn?_title, VoidTag.ofName?_title]
   simp only [ite_true, parseTitle]
   have h2 : escape s.toList ++ '<' :: '/' :: 't' :: 'i' :: 't' :: 'l' :: 'e' :: '>' :: rest =
       escape s.toList ++ '<' :: '/' :: ("title".toList ++ '>' :: rest) := by

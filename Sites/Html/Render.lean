@@ -26,7 +26,9 @@ def Link.render (url : ρ → String) : Link ρ → String
 /-- The attribute's value before escaping. -/
 def Attr.value (url : ρ → String) : Attr ρ → String
   | .id v | .cls v | .src v | .alt v | .title v | .lang v | .rel v | .type v | .name v
-  | .content v | .charset v | .role v | .ariaLabel v | .target v | .width v | .height v => v
+  | .content v | .charset v | .role v | .ariaLabel v | .target v | .width v | .height v
+  | .loading v | .crossorigin v | .viewBox v | .cx v | .cy v | .r v | .x v | .y v | .fill v
+  | .stroke v => v
   | .href l => l.render url
 
 /-- ` key="escaped value"` -/
