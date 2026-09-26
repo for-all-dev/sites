@@ -127,7 +127,7 @@ mutual
           let name := rest.takeWhile isNameChar
           let rest := rest.dropWhile isNameChar
           let nameS := String.ofList name
-          match Tag.ofName? nameS with
+          match Tag.ofNameIn? c nameS with
           | some t =>
             match parseAttrs route? (fuel + 1) rest with
             | some (attrs, '>' :: rest) =>

@@ -34,17 +34,23 @@ inductive Ctx where
   | tableCell
   /-- Children of `head`: `title`, `meta`, `link`. -/
   | head
+  /-- Children of inline `svg`, `g` and SVG `a`: shapes, text, groups and links. -/
+  | svg
   deriving DecidableEq, Repr
 
 set_option linter.missingDocs false in
-/-- Non-void tags. -/
+/-- Non-void tags. SVG elements are never void: in an HTML document a `<circle>` without a
+closing tag would swallow its siblings, so they are rendered with explicit closing tags.
+`svgText` and `svgA` are SVG's `text` and `a`; the latter shares its name with HTML's `a`, which
+is why `Tag.ofNameIn?` takes the surrounding category. -/
 inductive Tag where
   | div | «section» | article | nav | header | footer | main | aside | blockquote
-  | figure | figcaption
+  | figure | figcaption | iframe
   | p | h1 | h2 | h3 | h4 | h5 | h6 | pre
   | ul | ol | table
   | span | a | em | strong | code | b | i | small | kbd | sup | sub | mark
   | li | tr | td | th
+  | svg | g | circle | svgText | svgA
   deriving DecidableEq, Repr
 
 set_option linter.missingDocs false in
@@ -59,15 +65,18 @@ abbrev Tag.ctx : Tag → Ctx
   | .tr => .tableRow
   | .td | .th => .tableCell
   | .span | .a | .em | .strong | .code | .b | .i | .small | .kbd | .sup | .sub | .mark => .phrasing
+  | .g | .circle | .svgText | .svgA => .svg
   | _ => .flow
 
 /-- The category of a tag's children. -/
 abbrev Tag.childCtx : Tag → Ctx
-  | .p | .h1 | .h2 | .h3 | .h4 | .h5 | .h6 | .pre => .phrasing
+  | .p | .h1 | .h2 | .h3 | .h4 | .h5 | .h6 | .pre | .iframe => .phrasing
   | .ul | .ol => .listItem
   | .table => .tableRow
   | .tr => .tableCell
   | .span | .a | .em | .strong | .code | .b | .i | .small | .kbd | .sup | .sub | .mark => .phrasing
+  | .svg | .g | .circle | .svgA => .svg
+  | .svgText => .phrasing
   | _ => .flow
 
 /-- The category a void tag belongs to. -/
@@ -81,19 +90,21 @@ def Tag.name : Tag → String
   | .div => "div" | .«section» => "section" | .article => "article" | .nav => "nav"
   | .header => "header" | .footer => "footer" | .main => "main" | .aside => "aside"
   | .blockquote => "blockquote" | .figure => "figure" | .figcaption => "figcaption"
+  | .iframe => "iframe"
   | .p => "p" | .h1 => "h1" | .h2 => "h2" | .h3 => "h3" | .h4 => "h4" | .h5 => "h5" | .h6 => "h6"
   | .pre => "pre" | .ul => "ul" | .ol => "ol" | .table => "table"
   | .span => "span" | .a => "a" | .em => "em" | .strong => "strong" | .code => "code"
   | .b => "b" | .i => "i" | .small => "small" | .kbd => "kbd" | .sup => "sup" | .sub => "sub"
   | .mark => "mark"
   | .li => "li" | .tr => "tr" | .td => "td" | .th => "th"
+  | .svg => "svg" | .g => "g" | .circle => "circle" | .svgText => "text" | .svgA => "a"
 
-/-- Inverse of `Tag.name`. -/
+/-- Inverse of `Tag.name` outside SVG content (where `a` is HTML's `a`). -/
 def Tag.ofName? : String → Option Tag
   | "div" => some .div | "section" => some .«section» | "article" => some .article
   | "nav" => some .nav | "header" => some .header | "footer" => some .footer
   | "main" => some .main | "aside" => some .aside | "blockquote" => some .blockquote
-  | "figure" => some .figure | "figcaption" => some .figcaption
+  | "figure" => some .figure | "figcaption" => some .figcaption | "iframe" => some .iframe
   | "p" => some .p | "h1" => some .h1 | "h2" => some .h2 | "h3" => some .h3
   | "h4" => some .h4 | "h5" => some .h5 | "h6" => some .h6 | "pre" => some .pre
   | "ul" => some .ul | "ol" => some .ol | "table" => some .table
@@ -101,7 +112,13 @@ def Tag.ofName? : String → Option Tag
   | "code" => some .code | "b" => some .b | "i" => some .i | "small" => some .small
   | "kbd" => some .kbd | "sup" => some .sup | "sub" => some .sub | "mark" => some .mark
   | "li" => some .li | "tr" => some .tr | "td" => some .td | "th" => some .th
+  | "svg" => some .svg | "g" => some .g | "circle" => some .circle | "text" => some .svgText
   | _ => none
+
+/-- Inverse of `Tag.name` in category `c`: the tag named `s` that can be placed in `c`. Only
+`a` depends on the category, since HTML and SVG both have one. -/
+def Tag.ofNameIn? (c : Ctx) (s : String) : Option Tag :=
+  if c = .svg ∧ s = "a" then some .svgA else Tag.ofName? s
 
 /-- The void tag's name as it appears in markup. -/
 def VoidTag.name : VoidTag → String
@@ -145,6 +162,18 @@ inductive Attr (ρ : Type) where
   | target (v : String)
   | width (v : String)
   | height (v : String)
+  | loading (v : String)
+  | crossorigin (v : String)
+  /-- SVG `viewBox`. Emitted lowercase, as attribute names here are; the HTML parser's
+  SVG attribute adjustment restores the case. -/
+  | viewBox (v : String)
+  | cx (v : String)
+  | cy (v : String)
+  | r (v : String)
+  | x (v : String)
+  | y (v : String)
+  | fill (v : String)
+  | stroke (v : String)
   deriving Repr
 
 /-- The attribute's name as it appears in markup. -/
@@ -153,7 +182,9 @@ def Attr.key {ρ : Type} : Attr ρ → String
   | .title _ => "title" | .lang _ => "lang" | .rel _ => "rel" | .type _ => "type"
   | .name _ => "name" | .content _ => "content" | .charset _ => "charset" | .role _ => "role"
   | .ariaLabel _ => "aria-label" | .target _ => "target" | .width _ => "width"
-  | .height _ => "height"
+  | .height _ => "height" | .loading _ => "loading" | .crossorigin _ => "crossorigin"
+  | .viewBox _ => "viewbox" | .cx _ => "cx" | .cy _ => "cy" | .r _ => "r" | .x _ => "x"
+  | .y _ => "y" | .fill _ => "fill" | .stroke _ => "stroke"
 
 /-- Rebuilds an attribute from its key and (already unescaped) value.
 `route?` resolves internal links; when it fails the value becomes a plain `Link.url`. -/
@@ -161,13 +192,17 @@ def Attr.ofKey? {ρ : Type} (route? : String → Option ρ) (key value : String)
     Option (Attr ρ) :=
   match key with
   | "id" => some (.id value) | "class" => some (.cls value)
-  | "href" => some (.href (match route? value with | some r => .route r | none => .url value))
+  | "href" => some (.href (match route? value with | some rt => .route rt | none => .url value))
   | "src" => some (.src value) | "alt" => some (.alt value) | "title" => some (.title value)
   | "lang" => some (.lang value) | "rel" => some (.rel value) | "type" => some (.type value)
   | "name" => some (.name value) | "content" => some (.content value)
   | "charset" => some (.charset value) | "role" => some (.role value)
   | "aria-label" => some (.ariaLabel value) | "target" => some (.target value)
   | "width" => some (.width value) | "height" => some (.height value)
+  | "loading" => some (.loading value) | "crossorigin" => some (.crossorigin value)
+  | "viewbox" => some (.viewBox value) | "cx" => some (.cx value) | "cy" => some (.cy value)
+  | "r" => some (.r value) | "x" => some (.x value) | "y" => some (.y value)
+  | "fill" => some (.fill value) | "stroke" => some (.stroke value)
   | _ => none
 
 mutual
@@ -315,6 +350,12 @@ def_el li Tag.li
 def_el tr Tag.tr
 def_el td Tag.td
 def_el th Tag.th
+def_el iframe Tag.iframe
+def_el svg Tag.svg
+def_el svgGroup Tag.g
+def_el circle Tag.circle
+def_el svgText Tag.svgText
+def_el svgA Tag.svgA
 
 /-- `<br>` -/
 def br {c : Ctx} (h : Fits .phrasing c := by fits) : Node ρ c := void .br [] h
@@ -325,6 +366,10 @@ def img {c : Ctx} (attrs : List (Attr ρ) := []) (h : Fits .phrasing c := by fit
   void .img attrs h
 /-- `<meta>` -/
 def «meta» (attrs : List (Attr ρ) := []) : Node ρ .head := void .«meta» attrs
+/-- Evidence that a tag may be placed in category `c`: its own category, or phrasing content
+placed as flow content. This is exactly what `Fits` witnesses. -/
+def Tag.PlacesIn (t : Tag) (c : Ctx) : Prop := t.ctx = c ∨ (t.ctx = .phrasing ∧ c = .flow)
+
 /-- `<link>` -/
 def link (attrs : List (Attr ρ) := []) : Node ρ .head := void .link attrs
 
@@ -332,17 +377,20 @@ end
 
 /-! ## Name lemmas -/
 
-public theorem Tag.ofName?_name (t : Tag) : Tag.ofName? t.name = some t := by
-  cases t <;> rfl
+/-- Looking a tag's name up in any category it can be placed in gives the tag back. -/
+public theorem Tag.ofNameIn?_name (t : Tag) (c : Ctx) (h : t.PlacesIn c) :
+    Tag.ofNameIn? c t.name = some t := by
+  revert h; unfold Tag.PlacesIn; cases t <;> cases c <;> decide
 
 public theorem VoidTag.ofName?_name (t : VoidTag) : VoidTag.ofName? t.name = some t := by
   cases t <;> rfl
 
 /-- Void and non-void tag names are disjoint. -/
-public theorem Tag.ofName?_voidName (t : VoidTag) : Tag.ofName? t.name = none := by
-  cases t <;> rfl
+public theorem Tag.ofNameIn?_voidName (t : VoidTag) (c : Ctx) : Tag.ofNameIn? c t.name = none := by
+  cases t <;> cases c <;> rfl
 
-public theorem Tag.ofName?_title : Tag.ofName? "title" = none := rfl
+public theorem Tag.ofNameIn?_title (c : Ctx) : Tag.ofNameIn? c "title" = none := by
+  cases c <;> rfl
 public theorem VoidTag.ofName?_title : VoidTag.ofName? "title" = none := rfl
 
 public theorem Tag.name_chars (t : Tag) : ∀ c ∈ t.name.toList, isNameChar c = true := by

@@ -1,6 +1,8 @@
 module
 public meta import Sites
 public meta import Example
+import Sites
+import Example
 
 /-!
 # Tests and audit
@@ -95,3 +97,31 @@ example : Fits Tag.td.ctx Tag.ul.childCtx → False := fun h => nomatch h
 #guard Sites.Cli.validName "My Site" = false
 #guard Sites.Cli.validName "" = false
 #guard Sites.Cli.toolchainLine.startsWith "leanprover/lean4"
+
+/-! ## Inline SVG
+
+`a` names two tags; lookup is by category. A document with an SVG map inside round-trips. -/
+
+#guard Tag.ofNameIn? .svg "a" = some .svgA
+#guard Tag.ofNameIn? .flow "a" = some .a
+#guard Tag.ofNameIn? .phrasing "a" = some .a
+#guard Tag.ofNameIn? .svg "circle" = some .circle
+
+/-- A small map: one category circle, one linked organisation dot with its label. -/
+def svgDoc : Document Example.Route :=
+  { head := Nodes.ofList [title "svg"]
+    body := Nodes.ofList
+      [ div [.cls "map"]
+          [ svg [.viewBox "0 0 100 100"]
+              [ circle [.cls "circle", .cx "50", .cy "50", .r "40", .fill "#6366f1"],
+                svgText [.x "50", .y "5"] ["Mathematics"],
+                svgA [.href (.url "https://axiommath.ai/"), .target "_blank"]
+                  [ circle [.cx "50", .cy "50", .r "5"], svgText [.x "50", .y "70"] ["Axiom"] ] ] ] ] }
+
+#guard (svgDoc.toString Example.site.url).endsWith
+  "<a href=\"https://axiommath.ai/\" target=\"_blank\"><circle cx=\"50\" cy=\"50\" r=\"5\"></circle><text x=\"50\" y=\"70\">Axiom</text></a></svg></div></body></html>"
+#guard (parseDocument Example.site.route? (svgDoc.toString Example.site.url).toList).isSome
+
+/-- Text is not SVG content, and an SVG `a` is not phrasing content. -/
+example : Fits Tag.svgA.ctx Ctx.flow → False := fun h => nomatch h
+example : TextCtx Ctx.svg → False := fun ⟨h⟩ => nomatch h
