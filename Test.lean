@@ -86,3 +86,12 @@ example : Fits Tag.li.ctx Ctx.flow → False := fun h => nomatch h
 example : Fits Tag.td.ctx Tag.ul.childCtx → False := fun h => nomatch h
 #guard (Markdown.parseChars chars!"See [this](/nope/).").linksOk Example.route? = false
 #guard (Markdown.parseChars chars!"See [this](/blog/hello-world/).").linksOk Example.route? = true
+
+/-! ## Scaffolder helpers -/
+
+#guard Sites.Cli.moduleName "my-site" = "MySite"
+#guard Sites.Cli.moduleName "blog" = "Blog"
+#guard Sites.Cli.validName "my-site-2" = true
+#guard Sites.Cli.validName "My Site" = false
+#guard Sites.Cli.validName "" = false
+#guard Sites.Cli.toolchainLine.startsWith "leanprover/lean4"

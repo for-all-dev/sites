@@ -20,7 +20,23 @@ A static site generator written in Lean 4, with the parts that matter proven.
 Everything targets a Lean nightly (see `lean-toolchain`) and uses the module system, the
 `Std.WP` program logic and `Std.Http`. See `docs/` for the design and the verification story.
 
-## Use
+## Start a site
+
+The equivalent of `create docusaurus`:
+
+```sh
+git clone https://github.com/for-all-dev/sites.git && cd sites && lake build
+.lake/build/bin/sites new my-site     # scaffolds ./my-site
+cd my-site && lake build              # fetches the library from GitHub, builds your site
+.lake/build/bin/my-site serve         # http://127.0.0.1:8080/
+.lake/build/bin/my-site build         # writes dist/
+```
+
+The new project is six files: `lakefile.toml` (requires this repo), `lean-toolchain` (the same
+nightly), `MySite.lean` (routes, two pages, stylesheet), `Main.lean` (one line), a README and
+a `.gitignore`. Lake pins the library revision in `lake-manifest.json` on first build.
+
+## Work on this repo
 
 ```sh
 lake build            # build the library, the example site and the CLI
@@ -76,6 +92,7 @@ through `chars!"..."` so that the link check runs in the kernel in about a secon
 | `Sites/Markdown.lean` | The total Markdown subset and its lowering to typed HTML. |
 | `Sites/Build.lean` | `writeAll` over an abstract file system, the model contract, `Site.build_pages`. |
 | `Sites/Serve.lean` | The `Std.Http` development server. |
+| `Sites/Cli.lean` | `Cli.run` (the `main` of a site executable) and `Cli.new` (the scaffolder). |
 | `Example/Site.lean` | The example site. |
 | `Test.lean` | Executable checks and the axiom audit. |
 | `docs/` | Design notes, including planned future work. |

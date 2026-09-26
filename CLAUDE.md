@@ -16,6 +16,6 @@ Verification stack used here: `Std.WP` with `vcgen` and the intrinsic `requires`
 `mvcgen`/`Std.Do` is the deprecated predecessor; do not add new uses.
 
 Build and check: `lake build`, `lake build Test`, `scripts/check.sh`.
-The CLI is `.lake/build/bin/sites build|serve`.
+Scaffolding: `sites new NAME` (`Sites/Cli.lean`). The CLI is `.lake/build/bin/sites build|serve`.
 
 See `docs/semantics.agents.md` for the planned deep-embedding phase.

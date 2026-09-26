@@ -11,3 +11,4 @@ public import Sites.Site
 public import Sites.Markdown
 public import Sites.Build
 public import Sites.Serve
+public import Sites.Cli
