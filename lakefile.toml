@@ -1,0 +1,21 @@
+name = "sites"
+version = "0.1.0"
+defaultTargets = ["sites"]
+
+[leanOptions]
+# Every module opts into the new module system with the `module` header.
+autoImplicit = false
+linter.missingDocs = true
+
+[[lean_lib]]
+name = "Sites"
+
+[[lean_lib]]
+name = "Example"
+
+[[lean_exe]]
+name = "sites"
+root = "Main"
+
+[[lean_lib]]
+name = "Test"
